@@ -1,0 +1,10 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.venv/
+backend/data/*.db
+backend/data/*.db-*
+frontend/node_modules/
+frontend/dist/
+.pnpm-store/
+*.log
