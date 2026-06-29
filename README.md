@@ -107,3 +107,33 @@ git config --global user.email "你的邮箱"
 ```
 
 脚本不会保存 GitHub token。首次 push 时如果 Git 要求登录，请按提示输入 GitHub 用户名，并在密码位置输入有效 token；建议使用系统钥匙串或 Git Credential Manager 保存凭据。
+
+## 部署到公网：Vercel
+
+本项目已适配 Vercel：
+
+- 前端：构建 `frontend` 下的 Vite 应用
+- 后端：通过 `api/index.py` 暴露 FastAPI Python Function
+- API 路由：`/api/*`
+- 生产环境前端默认请求同域 API；本地开发仍默认请求 `http://127.0.0.1:8000`
+
+Vercel 免费方案不需要绑卡，但它是 Serverless，不是常驻进程。没人访问时函数不会一直运行；第一次访问或较长时间后访问可能有冷启动。SQLite 缓存使用 `/tmp` 临时目录，只作为加速缓存；冷启动、重新部署后缓存丢失是正常的，不影响计算结果。
+
+部署步骤：
+
+1. 同步代码到 GitHub：
+
+   ```bash
+   ./sync-github.sh "Add Vercel deployment"
+   ```
+
+2. 打开 Vercel Dashboard。
+3. 选择 `Add New...` → `Project`。
+4. 导入 `Trueybin/Fund-Backtesting` 仓库。
+5. Root Directory 保持仓库根目录。
+6. Framework Preset 可以选择 `Other` 或让 Vercel 自动识别。
+7. Build Command 使用根目录 `vercel.json` 中的配置：`npm run build`。
+8. Output Directory 使用：`frontend/dist`。
+9. 点击 Deploy。
+
+部署完成后，Vercel 会给你一个 `https://xxx.vercel.app` 地址。访问这个地址就是前端页面，页面内部会请求同域的 `/api/backtests`。
