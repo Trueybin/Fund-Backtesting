@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "installCommand": "cd frontend && pnpm install --frozen-lockfile",
-  "buildCommand": "cd frontend && pnpm run build",
+  "installCommand": "corepack enable pnpm && corepack prepare pnpm@11.7.0 --activate && cd frontend && pnpm install --frozen-lockfile",
+  "buildCommand": "corepack enable pnpm && cd frontend && pnpm run build",
   "outputDirectory": "frontend/dist",
   "functions": {
     "api/index.py": {
