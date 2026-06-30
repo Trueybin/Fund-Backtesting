@@ -1,7 +1,9 @@
 export type Frequency = 'daily' | 'weekly' | 'monthly'
 export type NonTradingDayPolicy = 'next_trading_day' | 'skip'
+export type AssetType = 'cn_fund' | 'us_stock'
 
 export interface BacktestRequest {
+  asset_type: AssetType
   fund_code: string
   start_date: string
   end_date: string
@@ -29,8 +31,12 @@ export interface CurvePoint {
 }
 
 export interface BacktestResult {
+  asset_type: AssetType
   fund_code: string
   fund_name: string | null
+  currency: string
+  price_label: string
+  share_label: string
   start_date: string
   end_date: string
   frequency: Frequency

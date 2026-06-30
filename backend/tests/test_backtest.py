@@ -4,7 +4,7 @@ import unittest
 import pandas as pd
 
 from app.backtest import run_backtest, scheduled_dates
-from app.schemas import BacktestRequest, Frequency, NonTradingDayPolicy
+from app.schemas import AssetType, BacktestRequest, Frequency, NonTradingDayPolicy
 
 
 class BacktestTests(unittest.TestCase):
@@ -86,6 +86,62 @@ class BacktestTests(unittest.TestCase):
             [transaction.scheduled_date for transaction in result.transactions],
             [date(2025, 10, 10), date(2025, 10, 13)],
         )
+        self.assertEqual(result.asset_type, AssetType.CN_FUND)
+        self.assertEqual(result.currency, "CNY")
+        self.assertEqual(result.price_label, "单位净值")
+
+    def test_us_stock_daily_frequency_uses_market_price_dates(self) -> None:
+        prices = pd.DataFrame(
+            {
+                "nav_date": pd.to_datetime(["2024-07-03", "2024-07-05", "2024-07-08"]),
+                "unit_nav": [10.0, 11.0, 12.0],
+                "change_rate": [None, None, None],
+            }
+        )
+        request = BacktestRequest(
+            asset_type="us_stock",
+            fund_code="voo",
+            start_date=date(2024, 7, 3),
+            end_date=date(2024, 7, 8),
+            investment_amount=59,
+            frequency="daily",
+            non_trading_day_policy="next_trading_day",
+        )
+        result = run_backtest(request, prices, "VOO", "test")
+        self.assertEqual(result.fund_code, "VOO")
+        self.assertEqual(result.asset_type, AssetType.US_STOCK)
+        self.assertEqual(result.currency, "USD")
+        self.assertEqual(result.price_label, "复权收盘价")
+        self.assertEqual(result.share_label, "股")
+        self.assertEqual(
+            [transaction.trade_date for transaction in result.transactions],
+            [date(2024, 7, 3), date(2024, 7, 5), date(2024, 7, 8)],
+        )
+        self.assertNotIn(date(2024, 7, 4), [transaction.trade_date for transaction in result.transactions])
+        self.assertAlmostEqual(result.transactions[0].purchased_shares, 5.9)
+
+    def test_us_stock_weekly_holiday_can_shift_to_next_market_date(self) -> None:
+        prices = pd.DataFrame(
+            {
+                "nav_date": pd.to_datetime(["2024-07-03", "2024-07-05", "2024-07-08"]),
+                "unit_nav": [10.0, 11.0, 12.0],
+                "change_rate": [None, None, None],
+            }
+        )
+        request = BacktestRequest(
+            asset_type="us_stock",
+            fund_code="QQQM",
+            start_date=date(2024, 7, 4),
+            end_date=date(2024, 7, 8),
+            investment_amount=59,
+            frequency="weekly",
+            non_trading_day_policy="next_trading_day",
+        )
+        result = run_backtest(request, prices, "QQQM", "test")
+        self.assertEqual(result.investment_count, 1)
+        self.assertEqual(result.transactions[0].scheduled_date, date(2024, 7, 4))
+        self.assertEqual(result.transactions[0].trade_date, date(2024, 7, 5))
+        self.assertAlmostEqual(result.transactions[0].purchased_shares, 59 / 11)
 
     def test_purchase_fee_reduces_purchased_shares(self) -> None:
         request = BacktestRequest(

@@ -6,6 +6,7 @@ from datetime import date, timedelta
 import pandas as pd
 
 from .schemas import (
+    AssetType,
     BacktestRequest,
     BacktestResult,
     CurvePoint,
@@ -51,13 +52,19 @@ def scheduled_dates(start_date: date, end_date: date, frequency: Frequency) -> l
     return dates
 
 
-def supported_purchase_dates(nav_dates: list[date]) -> list[date]:
+def supported_purchase_dates(nav_dates: list[date], asset_type: AssetType = AssetType.CN_FUND) -> list[date]:
     """Return dates that can be used for OTC fund purchases.
 
     AkShare NAV dates are the primary trading-day source. A weekday guard is kept
     because Chinese OTC funds generally do not accept subscriptions on weekends,
     including adjusted working Saturdays.
+
+    US stocks and ETFs use AkShare's actual daily market-price dates directly.
+    US holidays have no price row, so they are naturally excluded without a
+    hand-maintained holiday table.
     """
+    if asset_type == AssetType.US_STOCK:
+        return nav_dates
     return [nav_date for nav_date in nav_dates if nav_date.weekday() < 5]
 
 
@@ -101,7 +108,7 @@ def run_backtest(request: BacktestRequest, navs: pd.DataFrame, fund_name: str | 
     history["nav_date"] = pd.to_datetime(history["nav_date"])
     nav_dates = [value.date() for value in history["nav_date"]]
     nav_by_date = dict(zip(nav_dates, history["unit_nav"].astype(float)))
-    purchase_dates = supported_purchase_dates(nav_dates)
+    purchase_dates = supported_purchase_dates(nav_dates, request.asset_type)
     purchase_dates_set = set(purchase_dates)
 
     valuation_candidates = [value for value in nav_dates if value <= request.end_date]
@@ -177,8 +184,12 @@ def run_backtest(request: BacktestRequest, navs: pd.DataFrame, fund_name: str | 
     cashflows = [(transaction.trade_date, -transaction.gross_amount) for transaction in transactions]
     cashflows.append((valuation_date, final_value))
     return BacktestResult(
+        asset_type=request.asset_type,
         fund_code=request.fund_code,
         fund_name=fund_name,
+        currency="USD" if request.asset_type == AssetType.US_STOCK else "CNY",
+        price_label="复权收盘价" if request.asset_type == AssetType.US_STOCK else "单位净值",
+        share_label="股" if request.asset_type == AssetType.US_STOCK else "份",
         start_date=request.start_date,
         end_date=request.end_date,
         frequency=request.frequency,

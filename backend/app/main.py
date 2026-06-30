@@ -36,9 +36,9 @@ def health_check_alias() -> dict[str, str]:
 def create_backtest(request: BacktestRequest) -> BacktestResult:
     try:
         navs, data_source = fund_data_service.get_history(
-            request.fund_code, request.start_date, request.end_date
+            request.fund_code, request.start_date, request.end_date, request.asset_type
         )
-        fund_name = fund_data_service.get_name(request.fund_code)
+        fund_name = fund_data_service.get_name(request.fund_code, request.asset_type)
         return run_backtest(request, navs, fund_name, data_source)
     except (FundDataError, NoInvestmentError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

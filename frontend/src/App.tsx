@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import type { FormEvent, PointerEvent } from 'react'
 import { createBacktest } from './api'
 import type {
+  AssetType,
   BacktestRequest,
   BacktestResult,
   CurvePoint,
@@ -25,6 +26,44 @@ const policyLabels: Record<NonTradingDayPolicy, string> = {
   skip: '跳过',
 }
 
+const assetOptions: Record<AssetType, {
+  title: string
+  shortTitle: string
+  defaultCode: string
+  defaultAmount: string
+  codeLabel: string
+  amountLabel: string
+  codePlaceholder: string
+  feeLabel: string
+  loadingText: string
+  footerText: string
+}> = {
+  cn_fund: {
+    title: '国内场外基金',
+    shortTitle: '场外基金',
+    defaultCode: '710001',
+    defaultAmount: '1000',
+    codeLabel: '基金代码',
+    amountLabel: '每次定投金额（元）',
+    codePlaceholder: '如 710001',
+    feeLabel: '申购费率（%）',
+    loadingText: '正在拉取净值并回测…',
+    footerText: '每日定投按有净值的可买入交易日执行；非交易日顺延/跳过用于每周、每月计划。投入金额按含费金额累计。',
+  },
+  us_stock: {
+    title: '美股 ETF / 股票',
+    shortTitle: '美股',
+    defaultCode: 'VOO',
+    defaultAmount: '59',
+    codeLabel: 'ETF / 股票代码',
+    amountLabel: '每次定投金额（美元）',
+    codePlaceholder: '如 VOO、QQQM',
+    feeLabel: '交易费率（%）',
+    loadingText: '正在拉取美股价格并回测…',
+    footerText: '美股定投按 AkShare 返回的实际行情日期执行；美国节假日没有行情数据，因此不会买入。',
+  },
+}
+
 function dateInputValue(date: Date): string {
   const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
   return offsetDate.toISOString().slice(0, 10)
@@ -35,6 +74,7 @@ function initialForm(): FormState {
   const threeYearsAgo = new Date(today)
   threeYearsAgo.setFullYear(today.getFullYear() - 3)
   return {
+    asset_type: 'cn_fund',
     fund_code: '710001',
     start_date: dateInputValue(threeYearsAgo),
     end_date: dateInputValue(today),
@@ -45,10 +85,10 @@ function initialForm(): FormState {
   }
 }
 
-function formatMoney(value: number): string {
+function formatMoney(value: number, currency = 'CNY'): string {
   return new Intl.NumberFormat('zh-CN', {
     style: 'currency',
-    currency: 'CNY',
+    currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value)
@@ -69,7 +109,7 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max)
 }
 
-function LineChart({ curve }: { curve: CurvePoint[] }) {
+function LineChart({ curve, currency }: { curve: CurvePoint[]; currency: string }) {
   const [zoomPercent, setZoomPercent] = useState(100)
   const [startIndex, setStartIndex] = useState(0)
   const [hoverIndex, setHoverIndex] = useState<number | null>(null)
@@ -207,9 +247,9 @@ function LineChart({ curve }: { curve: CurvePoint[] }) {
       <div className="chart-toolbar">
         <div className="chart-readout">
           <strong>{activePoint.date}</strong>
-          <span>资产市值 {formatMoney(activePoint.market_value)}</span>
-          <span>累计投入 {formatMoney(activePoint.cumulative_invested)}</span>
-          <span className={activeReturn >= 0 ? 'positive' : 'negative'}>浮动收益 {formatMoney(activeReturn)}</span>
+          <span>资产市值 {formatMoney(activePoint.market_value, currency)}</span>
+          <span>累计投入 {formatMoney(activePoint.cumulative_invested, currency)}</span>
+          <span className={activeReturn >= 0 ? 'positive' : 'negative'}>浮动收益 {formatMoney(activeReturn, currency)}</span>
         </div>
         <div className="legend">
           <span><i className="legend-line invested" />累计投入</span>
@@ -253,7 +293,7 @@ function LineChart({ curve }: { curve: CurvePoint[] }) {
             <circle cx={activeX} cy={activeInvestedY} r="3.6" className="invested-dot" />
             <rect x={chart.plotLeft - valueLabelWidth - 8} y={valueLabelY} width={valueLabelWidth} height="24" rx="5" className="value-badge" />
             <text x={chart.plotLeft - 14} y={valueLabelY + 16} className="value-badge-text" textAnchor="end">
-              {formatMoney(activePoint.market_value)}
+              {formatMoney(activePoint.market_value, currency)}
             </text>
             <rect x={dateLabelX} y={chart.plotBottom + 12} width={dateLabelWidth} height="27" rx="6" className="date-badge" />
             <text x={dateLabelX + dateLabelWidth / 2} y={chart.plotBottom + 30} className="date-badge-text" textAnchor="middle">
@@ -263,9 +303,9 @@ function LineChart({ curve }: { curve: CurvePoint[] }) {
               <rect x={tooltipX} y={tooltipY} width={tooltipWidth} height={tooltipHeight} rx="8" />
               <text x={tooltipX + 12} y={tooltipY + 22} className="tooltip-title">{activePoint.date}</text>
               <text x={tooltipX + 12} y={tooltipY + 45}>资产市值</text>
-              <text x={tooltipX + tooltipWidth - 12} y={tooltipY + 45} textAnchor="end">{formatMoney(activePoint.market_value)}</text>
+              <text x={tooltipX + tooltipWidth - 12} y={tooltipY + 45} textAnchor="end">{formatMoney(activePoint.market_value, currency)}</text>
               <text x={tooltipX + 12} y={tooltipY + 67}>累计投入</text>
-              <text x={tooltipX + tooltipWidth - 12} y={tooltipY + 67} textAnchor="end">{formatMoney(activePoint.cumulative_invested)}</text>
+              <text x={tooltipX + tooltipWidth - 12} y={tooltipY + 67} textAnchor="end">{formatMoney(activePoint.cumulative_invested, currency)}</text>
             </g>
           </g>
         )}
@@ -334,9 +374,34 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [showDetails, setShowDetails] = useState(false)
+  const currentAsset = assetOptions[form.asset_type]
 
   function updateField<K extends keyof FormState>(field: K, value: FormState[K]) {
     setForm((previous) => ({ ...previous, [field]: value }))
+  }
+
+  function switchAssetType(assetType: AssetType) {
+    setForm((previous) => {
+      if (previous.asset_type === assetType) return previous
+      const previousDefaults = assetOptions[previous.asset_type]
+      const nextDefaults = assetOptions[assetType]
+      const looksLikeCnFundCode = /^\d{1,6}$/.test(previous.fund_code.trim())
+      const looksLikeUsTicker = /^[A-Za-z][A-Za-z.:-]{0,19}$/.test(previous.fund_code.trim())
+      const shouldReplaceCode =
+        previous.fund_code === previousDefaults.defaultCode ||
+        (assetType === 'us_stock' && looksLikeCnFundCode) ||
+        (assetType === 'cn_fund' && looksLikeUsTicker)
+      return {
+        ...previous,
+        asset_type: assetType,
+        fund_code: shouldReplaceCode ? nextDefaults.defaultCode : previous.fund_code,
+        investment_amount:
+          previous.investment_amount === previousDefaults.defaultAmount
+            ? nextDefaults.defaultAmount
+            : previous.investment_amount,
+        purchase_fee_rate_percent: assetType === 'us_stock' ? '0' : previous.purchase_fee_rate_percent,
+      }
+    })
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -346,6 +411,7 @@ function App() {
     setShowDetails(false)
     try {
       const request: BacktestRequest = {
+        asset_type: form.asset_type,
         fund_code: form.fund_code,
         start_date: form.start_date,
         end_date: form.end_date,
@@ -365,13 +431,16 @@ function App() {
   }
 
   const gainClass = result && result.total_return >= 0 ? 'positive' : 'negative'
+  const resultCurrency = result?.currency ?? (result?.asset_type === 'us_stock' ? 'USD' : 'CNY')
+  const resultPriceLabel = result?.price_label ?? (result?.asset_type === 'us_stock' ? '复权收盘价' : '单位净值')
+  const resultShareLabel = result?.share_label ?? (result?.asset_type === 'us_stock' ? '股' : '份')
 
   return (
     <main className="page-shell">
       <header className="hero">
         <p className="eyebrow">本地假设回测</p>
-        <h1>场外基金定投回测</h1>
-        <p>基于历史单位净值，测算固定金额定投的持有份额、期末市值与收益表现。</p>
+        <h1>资产定投回测</h1>
+        <p>支持国内场外基金和美股 ETF / 股票，按历史净值或价格测算固定金额定投表现。</p>
       </header>
 
       <section className="panel form-panel" aria-labelledby="form-title">
@@ -383,19 +452,31 @@ function App() {
           <span className="data-tag">数据来源：AkShare</span>
         </div>
         <form onSubmit={submit}>
+          <div className="asset-switch" aria-label="选择回测资产类型">
+            {(Object.keys(assetOptions) as AssetType[]).map((assetType) => (
+              <button
+                key={assetType}
+                type="button"
+                className={form.asset_type === assetType ? 'active' : ''}
+                onClick={() => switchAssetType(assetType)}
+              >
+                {assetOptions[assetType].title}
+              </button>
+            ))}
+          </div>
           <div className="form-grid">
             <label>
-              基金代码
+              {currentAsset.codeLabel}
               <input
                 value={form.fund_code}
                 onChange={(event) => updateField('fund_code', event.target.value)}
-                inputMode="numeric"
-                placeholder="如 710001"
+                inputMode={form.asset_type === 'cn_fund' ? 'numeric' : 'text'}
+                placeholder={currentAsset.codePlaceholder}
                 required
               />
             </label>
             <label>
-              每次定投金额（元）
+              {currentAsset.amountLabel}
               <input
                 type="number"
                 value={form.investment_amount}
@@ -435,7 +516,7 @@ function App() {
               </select>
             </label>
             <label>
-              申购费率（%）
+              {currentAsset.feeLabel}
               <input
                 type="number"
                 value={form.purchase_fee_rate_percent}
@@ -459,9 +540,9 @@ function App() {
             </label>
           </div>
           <div className="form-footer">
-            <p>每日定投按有净值的可买入交易日执行；非交易日顺延/跳过用于每周、每月计划。投入金额按含费金额累计。</p>
+            <p>{currentAsset.footerText}</p>
             <button type="submit" disabled={isLoading}>
-              {isLoading ? '正在拉取净值并回测…' : '开始回测'}
+              {isLoading ? currentAsset.loadingText : '开始回测'}
             </button>
           </div>
         </form>
@@ -474,28 +555,28 @@ function App() {
           <div className="result-title">
             <div>
               <p className="eyebrow">回测结果</p>
-              <h2>{result.fund_name ?? '未识别基金名称'} <span>{result.fund_code}</span></h2>
+              <h2>{result.fund_name ?? (result.asset_type === 'us_stock' ? result.fund_code : '未识别基金名称')} <span>{result.fund_code}</span></h2>
               <p>
-                {result.start_date} 至 {result.end_date} · {frequencyLabels[result.frequency]}定投 · 共 {result.investment_count} 笔
+                {assetOptions[result.asset_type].shortTitle} · {result.start_date} 至 {result.end_date} · {frequencyLabels[result.frequency]}定投 · 共 {result.investment_count} 笔
               </p>
             </div>
-            <span className="source-tag">净值：{result.data_source}</span>
+            <span className="source-tag">{resultPriceLabel}：{result.data_source}</span>
           </div>
 
           <div className="metric-grid">
             <article className="metric primary-metric">
               <p>最终市值</p>
-              <strong>{formatMoney(result.final_value)}</strong>
+              <strong>{formatMoney(result.final_value, resultCurrency)}</strong>
               <small>估值日 {result.valuation_date}</small>
             </article>
             <article className="metric">
               <p>累计投入</p>
-              <strong>{formatMoney(result.total_invested)}</strong>
-              <small>每次 {formatMoney(result.investment_amount)}</small>
+              <strong>{formatMoney(result.total_invested, resultCurrency)}</strong>
+              <small>每次 {formatMoney(result.investment_amount, resultCurrency)}</small>
             </article>
             <article className="metric">
               <p>总收益</p>
-              <strong className={gainClass}>{formatMoney(result.total_return)}</strong>
+              <strong className={gainClass}>{formatMoney(result.total_return, resultCurrency)}</strong>
               <small className={gainClass}>{formatRate(result.total_return_rate)}</small>
             </article>
             <article className="metric">
@@ -513,14 +594,14 @@ function App() {
                   <h3>累计投入与资产市值</h3>
                 </div>
               </div>
-              <LineChart curve={result.curve} />
+              <LineChart curve={result.curve} currency={resultCurrency} />
             </article>
             <article className="panel summary-panel">
               <p className="eyebrow">持仓摘要</p>
               <dl>
-                <div><dt>累计持有份额</dt><dd>{formatNumber(result.total_shares)} 份</dd></div>
-                <div><dt>结束日单位净值</dt><dd>{formatNumber(result.ending_nav, 4)}</dd></div>
-                <div><dt>申购费率</dt><dd>{formatRate(result.purchase_fee_rate)}</dd></div>
+                <div><dt>累计持有{resultShareLabel}</dt><dd>{formatNumber(result.total_shares)} {resultShareLabel}</dd></div>
+                <div><dt>结束日{resultPriceLabel}</dt><dd>{formatNumber(result.ending_nav, 4)}</dd></div>
+                <div><dt>{result.asset_type === 'us_stock' ? '交易费率' : '申购费率'}</dt><dd>{formatRate(result.purchase_fee_rate)}</dd></div>
                 <div><dt>非交易日</dt><dd>{policyLabels[result.non_trading_day_policy]}</dd></div>
               </dl>
             </article>
@@ -537,10 +618,10 @@ function App() {
                     <tr>
                       <th>计划日期</th>
                       <th>买入日期</th>
-                      <th>单位净值</th>
+                      <th>{resultPriceLabel}</th>
                       <th>定投金额</th>
-                      <th>买入份额</th>
-                      <th>累计份额</th>
+                      <th>买入{resultShareLabel}</th>
+                      <th>累计{resultShareLabel}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -549,7 +630,7 @@ function App() {
                         <td>{transaction.scheduled_date}</td>
                         <td>{transaction.trade_date}</td>
                         <td>{formatNumber(transaction.unit_nav, 4)}</td>
-                        <td>{formatMoney(transaction.gross_amount)}</td>
+                        <td>{formatMoney(transaction.gross_amount, resultCurrency)}</td>
                         <td>{formatNumber(transaction.purchased_shares, 4)}</td>
                         <td>{formatNumber(transaction.cumulative_shares, 4)}</td>
                       </tr>

@@ -17,7 +17,13 @@ class NonTradingDayPolicy(str, Enum):
     SKIP = "skip"
 
 
+class AssetType(str, Enum):
+    CN_FUND = "cn_fund"
+    US_STOCK = "us_stock"
+
+
 class BacktestRequest(BaseModel):
+    asset_type: AssetType = AssetType.CN_FUND
     fund_code: str = Field(..., min_length=1, max_length=20, examples=["710001"])
     start_date: date
     end_date: date
@@ -29,7 +35,7 @@ class BacktestRequest(BaseModel):
     @field_validator("fund_code")
     @classmethod
     def normalize_fund_code(cls, value: str) -> str:
-        normalized = value.strip()
+        normalized = value.strip().upper()
         if not normalized:
             raise ValueError("基金代码不能为空")
         return normalized
@@ -59,8 +65,12 @@ class CurvePoint(BaseModel):
 
 
 class BacktestResult(BaseModel):
+    asset_type: AssetType = AssetType.CN_FUND
     fund_code: str
     fund_name: str | None
+    currency: str = "CNY"
+    price_label: str = "单位净值"
+    share_label: str = "份"
     start_date: date
     end_date: date
     frequency: Frequency
