@@ -37,7 +37,6 @@ h3 { font-size: 18px; margin-bottom: 0; }
 .section-heading, .result-title, .form-footer { align-items: flex-start; display: flex; justify-content: space-between; gap: 20px; }
 .section-heading { margin-bottom: 24px; }
 .section-heading h2 { margin-bottom: 0; }
-.data-tag, .source-tag { background: #eaf5f3; border-radius: 999px; color: #286566; font-size: 12px; padding: 7px 10px; white-space: nowrap; }
 
 .form-grid { display: grid; gap: 18px; grid-template-columns: repeat(4, 1fr); }
 .asset-switch {
@@ -179,7 +178,6 @@ tbody tr:last-child td { border-bottom: 0; }
   .form-grid, .metric-grid { grid-template-columns: 1fr; }
   .span-two { grid-column: auto; }
   .form-footer button { width: 100%; }
-  .source-tag, .data-tag { align-self: flex-start; }
   .chart-wrap { margin-left: -10px; margin-right: -10px; overflow: hidden; }
   .chart-wrap svg { min-width: 570px; }
 }

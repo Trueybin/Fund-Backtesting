@@ -32,7 +32,7 @@ class FundDataService:
             else:
                 raw = ak.fund_open_fund_info_em(symbol=fund_code, indicator="单位净值走势")
                 navs = self._normalize_akshare_history(raw)
-                data_source = "akshare"
+                data_source = "remote"
         except Exception as exc:  # AkShare wraps remote data sources.
             cached = self.cache.get_navs(cache_key, start_date, end_date)
             if not cached.empty:
@@ -81,7 +81,7 @@ class FundDataService:
         for candidate in candidates:
             if candidate in frame.columns:
                 return candidate
-        raise FundDataError(f"AkShare 返回字段不符合预期，实际字段：{list(frame.columns)}")
+        raise FundDataError(f"数据字段不符合预期，实际字段：{list(frame.columns)}")
 
     def _normalize_akshare_history(self, frame: pd.DataFrame) -> pd.DataFrame:
         date_column = self._find_column(frame, ("净值日期", "日期"))
@@ -103,7 +103,7 @@ class FundDataService:
             raw = ak.stock_us_daily(symbol=symbol.upper(), adjust="qfq")
             navs = self._normalize_us_stock_history(raw)
             if not navs.empty:
-                return navs, "akshare stock_us_daily qfq"
+                return navs, "remote price daily adjusted"
         except Exception:
             pass
 
@@ -122,7 +122,7 @@ class FundDataService:
                 )
                 navs = self._normalize_us_stock_history(raw)
                 if not navs.empty:
-                    return navs, f"akshare stock_us_hist qfq ({eastmoney_symbol})"
+                    return navs, f"remote price history adjusted ({eastmoney_symbol})"
             except Exception as exc:
                 errors.append(f"{eastmoney_symbol}: {exc}")
 

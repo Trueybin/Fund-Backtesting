@@ -60,7 +60,7 @@ const assetOptions: Record<AssetType, {
     codePlaceholder: '如 VOO、QQQM',
     feeLabel: '交易费率（%）',
     loadingText: '正在拉取美股价格并回测…',
-    footerText: '美股定投按 AkShare 返回的实际行情日期执行；美国节假日没有行情数据，因此不会买入。',
+    footerText: '美股定投按实际行情日期执行；美国节假日没有行情数据，因此不会买入。',
   },
 }
 
@@ -449,7 +449,6 @@ function App() {
             <p className="eyebrow">回测参数</p>
             <h2 id="form-title">设置定投计划</h2>
           </div>
-          <span className="data-tag">数据来源：AkShare</span>
         </div>
         <form onSubmit={submit}>
           <div className="asset-switch" aria-label="选择回测资产类型">
@@ -560,7 +559,6 @@ function App() {
                 {assetOptions[result.asset_type].shortTitle} · {result.start_date} 至 {result.end_date} · {frequencyLabels[result.frequency]}定投 · 共 {result.investment_count} 笔
               </p>
             </div>
-            <span className="source-tag">{resultPriceLabel}：{result.data_source}</span>
           </div>
 
           <div className="metric-grid">
